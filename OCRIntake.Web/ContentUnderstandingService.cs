@@ -119,7 +119,14 @@ public class ContentUnderstandingService(HttpClient client, IConfiguration confi
             using var result = await client.SendAsync(poll, cancellation);
             result.EnsureSuccessStatusCode();
             var document = JsonDocument.Parse(await result.Content.ReadAsStringAsync(cancellation));
-            var status = document.RootElement.GetProperty("status").GetString();
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("status", out var statusProperty) ||
+                statusProperty.ValueKind != JsonValueKind.String)
+            {
+                document.Dispose();
+                throw new InvalidOperationException("Content Understanding returned no operation status.");
+            }
+            var status = statusProperty.GetString();
             if (string.Equals(status, "Succeeded", StringComparison.OrdinalIgnoreCase))
                 return document;
             document.Dispose();

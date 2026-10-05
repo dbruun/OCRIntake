@@ -50,7 +50,8 @@ app.UseStaticFiles();
 app.MapGet("/api/config", (IConfiguration config) => new
 {
     mode = config["ContentUnderstanding:Mode"] ?? "Live",
-    fields = LabelSchema.Fields
+    fields = LabelSchema.Fields,
+    fieldsDeprecated = true
 });
 app.MapGet("/api/profiles", async (ProfileStore profiles) => Results.Ok(await profiles.List()));
 app.MapGet("/api/profiles/{id:guid}/versions/{version:int}", async (Guid id, int version, ProfileStore profiles) =>
@@ -138,16 +139,16 @@ app.MapPost("/api/intakes/{id:guid}/review", async (Guid id, ReviewRequest revie
 {
     var entry = store.Get(id);
     if (entry is null) return Results.NotFound();
-    if (review.Values is null || review.Context is null ||
-        review.Values.Count != entry.Intake.Detected.Count ||
-        entry.Intake.Detected.Keys.Any(key => !review.Values.ContainsKey(key)) ||
-        review.Values.Values.Any(value => value?.Length > 10000) ||
-        review.Context.Category is not ("Food" or "Other") ||
-        review.Context.State is null || review.Context.State.Length > 100)
-        return Results.BadRequest(new { error = "Provide all known fields and a valid review context." });
     await entry.Gate.WaitAsync();
     try
     {
+        if (review.Values is null || review.Context is null ||
+            review.Values.Count != entry.Intake.Detected.Count ||
+            entry.Intake.Detected.Keys.Any(key => !review.Values.ContainsKey(key)) ||
+            review.Values.Values.Any(value => value?.Length > 10000) ||
+            review.Context.Category is not ("Food" or "Other") ||
+            review.Context.State is null || review.Context.State.Length > 100)
+            return Results.BadRequest(new { error = "Provide all known fields and a valid review context." });
         if (entry.Intake.ApprovedAt is not null || review.Revision != entry.Intake.Revision)
             return Results.Conflict(new { error = "This intake was approved or changed. Reload it before reviewing." });
         entry.Intake = entry.Intake with
