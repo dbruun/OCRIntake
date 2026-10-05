@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 11 * 1024 * 1024);
 builder.Services.AddSingleton<ComplianceService>();
 builder.Services.AddSingleton<IntakeStore>();
+builder.Services.AddSingleton<ProfileStore>();
 builder.Services.AddHttpClient<ContentUnderstandingService>(client => client.Timeout = TimeSpan.FromSeconds(120))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 var app = builder.Build();
@@ -51,13 +52,46 @@ app.MapGet("/api/config", (IConfiguration config) => new
     mode = config["ContentUnderstanding:Mode"] ?? "Live",
     fields = LabelSchema.Fields
 });
+app.MapGet("/api/profiles", async (ProfileStore profiles) => Results.Ok(await profiles.List()));
+app.MapGet("/api/profiles/{id:guid}/versions/{version:int}", async (Guid id, int version, ProfileStore profiles) =>
+{
+    var profile = await profiles.Get(id, version);
+    return profile is null ? Results.NotFound() : Results.Ok(profile);
+});
+app.MapPost("/api/profiles", async (ProfileRequest request, ProfileStore profiles) =>
+{
+    var error = ProfileStore.Validate(request);
+    if (error is not null) return Results.BadRequest(new { error });
+    var profile = await profiles.Save(null, request);
+    return profile is null
+        ? Results.Conflict(new { error = "New profiles require version 0; the demo allows at most 50 profiles." })
+        : Results.Ok(profile);
+});
+app.MapPost("/api/profiles/{id:guid}", async (Guid id, ProfileRequest request, ProfileStore profiles) =>
+{
+    var error = ProfileStore.Validate(request);
+    if (error is not null) return Results.BadRequest(new { error });
+    var profile = await profiles.Save(id, request);
+    return profile is null
+        ? Results.Conflict(new { error = "Profile changed or does not exist. Reload settings before saving." })
+        : Results.Ok(profile);
+});
 
 app.MapPost("/api/intakes", async (HttpRequest request, ContentUnderstandingService extraction,
-    ComplianceService compliance, IntakeStore store, CancellationToken cancellation) =>
+    ComplianceService compliance, IntakeStore store, ProfileStore profiles, CancellationToken cancellation) =>
 {
     if (!request.HasFormContentType)
         return Results.BadRequest(new { error = "Upload an image as multipart form data." });
     var form = await request.ReadFormAsync(cancellation);
+    var profileId = Guid.Empty;
+    int? profileVersion = null;
+    if ((form.ContainsKey("profileId") && !Guid.TryParse(form["profileId"], out profileId)) ||
+        (form.ContainsKey("profileVersion") &&
+         (!int.TryParse(form["profileVersion"], out var parsedVersion) || (profileVersion = parsedVersion) < 1)))
+        return Results.BadRequest(new { error = "Select a valid extraction profile and version." });
+    var profile = await profiles.Get(profileId, profileVersion);
+    if (profile is null)
+        return Results.BadRequest(new { error = "The selected extraction profile version does not exist." });
     if (form.Files.Count != 1 || form.Files[0].Length is <= 0 or > 10 * 1024 * 1024)
         return Results.BadRequest(new { error = "Upload one JPEG or PNG image, at most 10 MB." });
     var file = form.Files[0];
@@ -70,12 +104,12 @@ app.MapPost("/api/intakes", async (HttpRequest request, ContentUnderstandingServ
     if (!png && !jpeg)
         return Results.BadRequest(new { error = "Only JPEG and PNG images are supported." });
     var mediaType = png ? "image/png" : "image/jpeg";
-    var detected = await extraction.Extract(image, mediaType, cancellation);
+    var detected = await extraction.Extract(image, mediaType, profile, cancellation);
     var values = detected.ToDictionary(x => x.Key, x => x.Value.Value);
     var context = new ReviewContext("Other", "", false, false);
     var intake = new Intake(Guid.NewGuid(), Path.GetFileName(file.FileName), DateTimeOffset.UtcNow,
         extraction.Mode, detected, values, context, compliance.Screen(values, context),
-        SourceSha256: Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image)));
+        SourceSha256: Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image)), Profile: profile);
     if (!store.TryAdd(new(intake, image, mediaType)))
         return Results.Problem("Demo draft capacity reached. Retry after drafts expire (two hours).", statusCode: 503);
     return Results.Ok(intake);
@@ -105,8 +139,8 @@ app.MapPost("/api/intakes/{id:guid}/review", async (Guid id, ReviewRequest revie
     var entry = store.Get(id);
     if (entry is null) return Results.NotFound();
     if (review.Values is null || review.Context is null ||
-        review.Values.Count != LabelSchema.Fields.Count ||
-        LabelSchema.Fields.Keys.Any(key => !review.Values.ContainsKey(key)) ||
+        review.Values.Count != entry.Intake.Detected.Count ||
+        entry.Intake.Detected.Keys.Any(key => !review.Values.ContainsKey(key)) ||
         review.Values.Values.Any(value => value?.Length > 10000) ||
         review.Context.Category is not ("Food" or "Other") ||
         review.Context.State is null || review.Context.State.Length > 100)

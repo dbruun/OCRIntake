@@ -13,8 +13,8 @@ public class ComplianceService
                 string.IsNullOrWhiteSpace(rule.Explanation) ||
                 !Uri.TryCreate(rule.ReferenceUrl, UriKind.Absolute, out var url) || url.Scheme != "https" ||
                 !new[] { "required", "requiredAny", "missingText", "prohibitedText", "coa" }.Contains(rule.Kind) ||
-                (rule.Kind is not ("coa" or "requiredAny") && !LabelSchema.Fields.ContainsKey(rule.Field)) ||
-                (rule.Kind == "requiredAny" && (rule.Fields.Length == 0 || rule.Fields.Any(field => !LabelSchema.Fields.ContainsKey(field)))) ||
+                (rule.Kind is not ("coa" or "requiredAny") && !ProfileStore.ValidKey(rule.Field)) ||
+                (rule.Kind == "requiredAny" && (rule.Fields.Length == 0 || rule.Fields.Any(field => !ProfileStore.ValidKey(field)))) ||
                 (rule.Kind is "missingText" or "prohibitedText" && string.IsNullOrWhiteSpace(rule.Text)))
                 throw new InvalidOperationException("Invalid compliance rule configuration.");
         }
@@ -22,9 +22,12 @@ public class ComplianceService
 
     public Screening Screen(Dictionary<string, string?> values, ReviewContext context)
     {
-        var applicable = rules.Where(r =>
+        var contextual = rules.Where(r =>
             (r.Category.Length == 0 || r.Category.Equals(context.Category, StringComparison.OrdinalIgnoreCase)) &&
             (r.State.Length == 0 || r.State.Equals(context.State, StringComparison.OrdinalIgnoreCase))).ToArray();
+        var applicable = contextual.Where(rule => rule.Kind == "coa" ||
+            (rule.Kind == "requiredAny" ? rule.Fields.All(values.ContainsKey) : values.ContainsKey(rule.Field))).ToArray();
+        var skipped = contextual.Except(applicable).Select(rule => rule.Id).ToArray();
         var findings = new List<Finding>();
         foreach (var rule in applicable)
         {
@@ -42,6 +45,7 @@ public class ComplianceService
                 findings.Add(new(rule.Id, rule.Severity, rule.Explanation, rule.Reference, rule.ReferenceUrl));
         }
         return new(findings, applicable.Select(r => r.Id).ToArray(),
+            (skipped.Length == 0 ? "" : $"Not assessed because fields are outside this profile: {string.Join(", ", skipped)}. ") +
             "Screening is advisory, not a legal determination. Only the listed configured rules were evaluated. " +
             "Missing data may reflect incomplete photography or extraction errors. Warnings, disclosures, product " +
             "restrictions, state requirements and COA obligations are unassessed unless applicable rules are configured. " +

@@ -13,5 +13,7 @@ img { max-width: 100%; max-height: 80vh; object-fit: contain; position: sticky; 
 .notice { background: #fff3d2; border-left: 4px solid #996300; padding: 1rem; }
 .check { font-weight: normal; }
 fieldset { border: 1px solid #8194a5; }
+.profile-field { margin: 1rem 0; background: white; }
+nav { margin-bottom: 1rem; }
 #status { font-weight: 600; }
 @media (max-width: 700px) { .columns { grid-template-columns: 1fr; } main { padding: 1rem; } img { position: static; } }

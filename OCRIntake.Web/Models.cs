@@ -25,7 +25,16 @@ public record Intake(
     Dictionary<string, DetectedField> Detected, Dictionary<string, string?> Values,
     ReviewContext Context, Screening Screening, int Revision = 0,
     string Status = "Pending review", string? Inspector = null, DateTimeOffset? ApprovedAt = null,
-    string SourceSha256 = "");
+    string SourceSha256 = "", ExtractionProfile? Profile = null);
+
+public record ExtractionField(string Key, string Name, string Description);
+public record ExtractionProfile(Guid Id, int Version, string Name, ExtractionField[] Fields, DateTimeOffset CreatedAt)
+{
+    public string AnalyzerId => $"ocrintake-{Id:N}-v{Version}-" +
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(Fields)))[..12].ToLowerInvariant();
+}
+public record ProfileRequest(string Name, ExtractionField[] Fields, int Version = 0);
 
 public class ComplianceRule
 {

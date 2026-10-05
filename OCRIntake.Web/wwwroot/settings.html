@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Extraction profiles · Settings</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="settings.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Extraction settings</h1>
+    <nav><a href="/">Product intake</a></nav>
+    <p>Create reusable profiles for different product types. Specify what to look for on the image—not what to guess.</p>
+    <p class="notice">Saving creates a new immutable profile version. Existing intakes keep their original fields and instructions.
+      In live mode, the backend creates the selected version's Microsoft Content Understanding analyzer on its first upload.
+      Sample mode returns synthetic values and does not inspect images. Compliance rules are configured separately.</p>
+    <label>Profile to edit<select id="editProfile" disabled><option value="">New profile</option></select></label>
+    <p id="version"></p>
+    <form id="profileForm">
+      <fieldset id="editor" disabled>
+        <legend>Profile definition</legend>
+        <label>Profile name<input id="profileName" required maxlength="100" placeholder="Example: Cannabis packaging"></label>
+        <p>Define 1–30 fields. A stable key identifies the field in saved records and compliance rules; changing it creates a different field.
+          All extracted values are text, preserving printed units and wording. Confidence may be unavailable.</p>
+        <div id="profileFields"></div>
+        <button id="addField" type="button">Add field</button>
+        <button id="saveProfile" type="submit">Save profile</button>
+      </fieldset>
+    </form>
+    <p id="settingsStatus" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>
