@@ -1,6 +1,8 @@
 let intake;
 let profiles = [];
 let dirty = true;
+let workflowBusy = false;
+let refreshingProfiles = false;
 const el = id => document.getElementById(id);
 const status = text => { el("status").textContent = text; };
 async function api(path, options = {}) {
@@ -47,11 +49,16 @@ function markDirty() {
   el("approveButton").disabled = true;
 }
 el("reviewForm").addEventListener("input", markDirty);
+function updateUploadControls() {
+  el("extract").disabled = workflowBusy || refreshingProfiles || !profiles.length;
+  el("profile").disabled = workflowBusy || refreshingProfiles || !profiles.length;
+  el("refreshProfiles").disabled = workflowBusy || refreshingProfiles;
+}
 async function refreshProfiles() {
+  if (refreshingProfiles || workflowBusy) return;
   const selected = el("profile").value;
-  el("profile").disabled = true;
-  el("refreshProfiles").disabled = true;
-  el("extract").disabled = true;
+  refreshingProfiles = true;
+  updateUploadControls();
   try {
     profiles = await api("/api/profiles");
     el("profile").replaceChildren();
@@ -62,16 +69,17 @@ async function refreshProfiles() {
       el("profile").append(option);
     }
     if (profiles.some(profile => profile.id === selected)) el("profile").value = selected;
-    el("profile").disabled = false;
-    el("extract").disabled = !profiles.length;
-  } finally { el("refreshProfiles").disabled = false; }
+  } finally {
+    refreshingProfiles = false;
+    updateUploadControls();
+  }
 }
 el("refreshProfiles").addEventListener("click", () => refreshProfiles().catch(error => status(error.message)));
 el("upload").addEventListener("submit", async event => {
   event.preventDefault();
-  el("extract").disabled = true;
-  el("refreshProfiles").disabled = true;
-  el("profile").disabled = true;
+  if (workflowBusy || refreshingProfiles) return;
+  workflowBusy = true;
+  updateUploadControls();
   el("review").hidden = true;
   intake = null;
   status("Preparing the selected analyzer and extracting information… The first live upload for a profile version may take up to four minutes.");
@@ -118,16 +126,17 @@ el("upload").addEventListener("submit", async event => {
     status("Extraction ready. Review every field, select context, and save corrections before approval.");
   } catch (error) { status(error.message); }
   finally {
-    el("extract").disabled = false;
-    el("refreshProfiles").disabled = false;
-    el("profile").disabled = false;
+    workflowBusy = false;
+    updateUploadControls();
   }
 });
 el("reviewForm").addEventListener("submit", async event => {
   event.preventDefault();
+  if (workflowBusy || !intake) return;
+  const current = intake;
+  workflowBusy = true;
+  updateUploadControls();
   el("saveReview").disabled = true;
-  el("extract").disabled = true;
-  el("refreshProfiles").disabled = true;
   // Capture a snapshot; edits made during this request still require another save.
   const values = Object.fromEntries([...document.querySelectorAll("[data-field]")].map(field => [field.dataset.field, field.value]));
   const context = {
@@ -137,28 +146,33 @@ el("reviewForm").addEventListener("submit", async event => {
   dirty = false;
   el("approveButton").disabled = true;
   try {
-    intake = await post(`/api/intakes/${intake.id}/review`, { values, context, revision: intake.revision });
+    const reviewed = await post(`/api/intakes/${current.id}/review`, { values, context, revision: current.revision });
+    if (intake?.id !== current.id) return;
+    intake = reviewed;
     renderScreening();
     el("approveButton").disabled = dirty;
     status(dirty ? "Further edits are unsaved. Save again before approval." : "Review saved and screening refreshed. Explicit approval is still required.");
   } catch (error) { markDirty(); status(error.message); }
   finally {
     el("saveReview").disabled = false;
-    el("extract").disabled = false;
-    el("refreshProfiles").disabled = false;
+    workflowBusy = false;
+    updateUploadControls();
   }
 });
 el("approval").addEventListener("submit", async event => {
   event.preventDefault();
-  if (dirty || !el("approveCheck").checked) return;
+  if (workflowBusy || !intake || dirty || !el("approveCheck").checked) return;
+  const current = intake;
+  workflowBusy = true;
+  updateUploadControls();
   el("approveButton").disabled = true;
-  el("extract").disabled = true;
-  el("refreshProfiles").disabled = true;
   el("reviewForm").querySelectorAll("input,textarea,select,button").forEach(field => { field.disabled = true; });
   try {
-    intake = await post(`/api/intakes/${intake.id}/approve`, {
-      approved: true, inspector: el("inspector").value, revision: intake.revision
+    const approved = await post(`/api/intakes/${current.id}/approve`, {
+      approved: true, inspector: el("inspector").value, revision: current.revision
     });
+    if (intake?.id !== current.id) return;
+    intake = approved;
     el("approval").hidden = true;
     el("download").hidden = false;
     status(`Approved by ${intake.inspector}. Record ${intake.id} saved at ${intake.approvedAt}.`);
@@ -167,7 +181,7 @@ el("approval").addEventListener("submit", async event => {
     el("approveButton").disabled = dirty;
     status(error.message);
   }
-  finally { el("extract").disabled = false; el("refreshProfiles").disabled = false; }
+  finally { workflowBusy = false; updateUploadControls(); }
 });
 el("download").addEventListener("click", () => {
   const url = URL.createObjectURL(new Blob([JSON.stringify(intake, null, 2)], { type: "application/json" }));
