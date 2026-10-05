@@ -32,7 +32,7 @@ Open **Extraction settings** from the intake page (opens a new tab so your curre
 - Select an existing profile in settings to edit it. Saving appends a new version rather than modifying the previous one. Stale edits from another tab are rejected; reload settings to get the latest version.
 - Every intake captures the selected profile's ID, version, name, field definitions and analyzer ID **at upload time**. The review UI and server validation use that snapshot, not the latest settings. Changing settings never alters an existing draft or approved record. Approved JSON includes the complete snapshot.
 
-The original 13-field product-label schema is automatically seeded as **Product labels v1**. Profiles and all their versions persist under `Storage:Directory/profiles` (by default `OCRIntake.Web/App_Data/profiles`), separate from approved intakes. Neither is publicly served. Use private persistent storage; settings are not credentials storage. Legacy approved JSON without a profile snapshot remains readable, but does not gain a fabricated snapshot.
+The original 13-field product-label schema is automatically seeded as **Product labels v1**. Profiles and all their versions persist under `Storage:Directory/profiles` (by default `OCRIntake.Web/App_Data/profiles`), separate from approved intakes. Neither is publicly served. Profile history is indexed in memory at startup and updated after successful saves; do not edit these files outside the application. Use private persistent storage; settings are not credentials storage. Legacy approved JSON without a profile snapshot remains readable, but does not gain a fabricated snapshot.
 
 ## Microsoft Foundry Content Understanding (live images)
 

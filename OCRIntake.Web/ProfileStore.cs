@@ -7,6 +7,7 @@ public sealed class ProfileStore
 {
     private readonly string directory;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly List<ExtractionProfile> history = [];
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public ProfileStore(IWebHostEnvironment environment, IConfiguration configuration)
@@ -26,6 +27,7 @@ public sealed class ProfileStore
                 DateTimeOffset.UtcNow);
             Write(profile);
         }
+        history.AddRange(ReadAll());
     }
 
     public static bool ValidKey(string? key) =>
@@ -49,7 +51,7 @@ public sealed class ProfileStore
     public async Task<ExtractionProfile[]> List()
     {
         await gate.WaitAsync();
-        try { return ReadAll().GroupBy(profile => profile.Id).Select(group => group.MaxBy(profile => profile.Version)!)
+        try { return history.GroupBy(profile => profile.Id).Select(group => group.MaxBy(profile => profile.Version)!)
             .OrderBy(profile => profile.Id != Guid.Empty).ThenBy(profile => profile.Name).ToArray(); }
         finally { gate.Release(); }
     }
@@ -61,10 +63,9 @@ public sealed class ProfileStore
         {
             if (version is not null)
             {
-                var path = PathFor(id, version.Value);
-                return File.Exists(path) ? JsonSerializer.Deserialize<ExtractionProfile>(File.ReadAllText(path)) : null;
+                return history.SingleOrDefault(profile => profile.Id == id && profile.Version == version);
             }
-            return ReadAll().Where(profile => profile.Id == id).MaxBy(profile => profile.Version);
+            return history.Where(profile => profile.Id == id).MaxBy(profile => profile.Version);
         }
         finally { gate.Release(); }
     }
@@ -74,7 +75,7 @@ public sealed class ProfileStore
         await gate.WaitAsync();
         try
         {
-            var existing = ReadAll();
+            var existing = history;
             var latest = id is null ? null : existing.Where(profile => profile.Id == id).MaxBy(profile => profile.Version);
             if (id is not null && (latest is null || request.Version != latest.Version))
                 return null;
@@ -85,6 +86,7 @@ public sealed class ProfileStore
             var profile = new ExtractionProfile(id ?? Guid.NewGuid(), (latest?.Version ?? 0) + 1,
                 request.Name.Trim(), fields, DateTimeOffset.UtcNow);
             Write(profile);
+            history.Add(profile);
             return profile;
         }
         finally { gate.Release(); }

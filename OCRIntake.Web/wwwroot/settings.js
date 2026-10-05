@@ -87,15 +87,22 @@ el("profileForm").addEventListener("submit", async event => {
   el("editor").disabled = true;
   el("editProfile").disabled = true;
   status("Saving profile…");
+  let reloadRequired = false;
   try {
     const saved = await api(editing ? `/api/profiles/${editing.id}` : "/api/profiles", request);
-    await load(saved.id);
-    status(`Saved ${saved.name} v${saved.version}. Refresh profiles on the intake page to select it. Existing intakes have not changed.`);
+    editing = saved;
+    try {
+      await load(saved.id);
+      status(`Saved ${saved.name} v${saved.version}. Refresh profiles on the intake page to select it. Existing intakes have not changed.`);
+    } catch (error) {
+      reloadRequired = true;
+      status(`Saved ${saved.name} v${saved.version}, but settings could not refresh: ${error.message}. Reload this page before making further changes. Do not retry creating the profile.`);
+    }
   } catch (error) {
     status(`${error.message} If the profile changed in another tab, reload this page before retrying.`);
   } finally {
-    el("editor").disabled = false;
-    el("editProfile").disabled = false;
+    el("editor").disabled = reloadRequired;
+    el("editProfile").disabled = reloadRequired;
   }
 });
 load().then(() => {

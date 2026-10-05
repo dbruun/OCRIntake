@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace OCRIntake.Web;
@@ -6,7 +7,7 @@ namespace OCRIntake.Web;
 public class ContentUnderstandingService(HttpClient client, IConfiguration configuration)
 {
     private static readonly SemaphoreSlim ProvisionGate = new(1, 1);
-    private static readonly HashSet<string> Provisioned = [];
+    private static readonly ConcurrentDictionary<string, bool> Provisioned = new();
     public string Mode => configuration["ContentUnderstanding:Mode"] ?? "Live";
 
     public async Task<Dictionary<string, DetectedField>> Extract(byte[] image, string mediaType,
@@ -73,10 +74,11 @@ public class ContentUnderstandingService(HttpClient client, IConfiguration confi
 
     private async Task EnsureAnalyzer(Uri url, Uri endpoint, string key, ExtractionProfile profile, CancellationToken cancellation)
     {
+        if (Provisioned.ContainsKey(url.AbsoluteUri)) return;
         await ProvisionGate.WaitAsync(cancellation);
         try
         {
-            if (Provisioned.Contains(url.AbsoluteUri)) return;
+            if (Provisioned.ContainsKey(url.AbsoluteUri)) return;
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             deadline.CancelAfter(TimeSpan.FromSeconds(110));
             using var request = new HttpRequestMessage(HttpMethod.Put, url);
@@ -98,7 +100,7 @@ public class ContentUnderstandingService(HttpClient client, IConfiguration confi
             using var response = await client.SendAsync(request, deadline.Token);
             response.EnsureSuccessStatusCode();
             using var operation = await Poll(response, url, endpoint, key, deadline.Token);
-            Provisioned.Add(url.AbsoluteUri);
+            Provisioned.TryAdd(url.AbsoluteUri, true);
         }
         finally { ProvisionGate.Release(); }
     }
