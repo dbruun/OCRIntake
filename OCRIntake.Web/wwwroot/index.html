@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product intake · Inspector review</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Product intake</h1>
+    <nav><a href="settings.html" target="_blank" rel="noopener">Extraction settings (opens in a new tab)</a></nav>
+    <p>Upload a product label, review the extracted information, then explicitly approve it.</p>
+    <p id="mode" class="notice"></p>
+    <form id="upload">
+      <label>Extraction profile<select id="profile" required disabled></select></label>
+      <button id="refreshProfiles" type="button">Refresh profiles</button>
+      <label>Label image (JPEG or PNG, maximum 10 MB)<input id="file" type="file" accept="image/jpeg,image/png" required></label>
+      <button id="extract" disabled>Upload and extract</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <section id="review" hidden>
+      <h2>Inspector verification</h2>
+      <p id="intakeProfile"></p>
+      <p>Compare every value with the image. Confidence is an AI estimate, not proof of accuracy. Blank values mean not detected.</p>
+      <div class="columns">
+        <div><img id="preview" alt="Uploaded product label"></div>
+        <form id="reviewForm">
+          <div id="fields"></div>
+          <fieldset>
+            <legend>Compliance context</legend>
+            <label>Product category<select id="category"><option>Other</option><option>Food</option></select></label>
+            <label>State / jurisdiction<input id="state" maxlength="100" placeholder="Match the configured rule jurisdiction"></label>
+            <label class="check"><input id="coaRequired" type="checkbox"> Inspector has determined a COA is required</label>
+            <label class="check"><input id="coaProvided" type="checkbox"> COA has been provided</label>
+          </fieldset>
+          <button id="saveReview">Save corrections and re-screen</button>
+        </form>
+      </div>
+      <h2>Advisory compliance screening</h2>
+      <div id="screening"></div>
+      <form id="approval">
+        <label>Inspector name (self-attested for this demo)<input id="inspector" required maxlength="200"></label>
+        <label class="check"><input id="approveCheck" type="checkbox" required> I verified the label information and reviewed the potential issues. I explicitly approve saving this revision.</label>
+        <button id="approveButton" disabled>Approve and save</button>
+      </form>
+      <button id="download" hidden>Download approved record</button>
+    </section>
+  </main>
+</body>
+</html>
