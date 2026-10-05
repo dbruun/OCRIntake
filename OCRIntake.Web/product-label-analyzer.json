@@ -1,0 +1,27 @@
+{
+  "description": "Extract only visible product packaging label information. Do not infer missing values. Preserve printed wording and units.",
+  "baseAnalyzerId": "prebuilt-document",
+  "config": {
+    "enableOcr": true,
+    "returnDetails": true,
+    "estimateFieldSourceAndConfidence": true
+  },
+  "fieldSchema": {
+    "name": "ProductLabel",
+    "fields": {
+      "ProductName": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Product name / statement of identity printed on the label." },
+      "Brand": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Brand printed on the label." },
+      "Manufacturer": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Manufacturer name and address, if visible." },
+      "Distributor": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Distributor or packer name and address, if visible." },
+      "LotBatchNumber": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Lot or batch number, preserving all characters." },
+      "ExpirationDate": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Expiration, use-by or best-before date exactly as printed. Do not guess an ambiguous date." },
+      "ProductSize": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Product size, count or dimensions printed on the label." },
+      "WeightVolume": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Net weight or volume with all printed units." },
+      "PackagingInformation": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Visible packaging descriptions or packaging information printed on the label." },
+      "RegulatoryStatements": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "All visible regulatory statements, certifications and disclosures, verbatim." },
+      "WarningLabels": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "All visible warnings and caution statements, verbatim." },
+      "QrCodes": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "Decoded QR code contents only if actually readable. If a QR code is visible but cannot be decoded, report 'QR code present; contents unreadable'. Never invent a URL." },
+      "OtherLabelInformation": { "type": "string", "method": "extract", "estimateSourceAndConfidence": true, "description": "All other visible label text, including ingredients, nutrition, business addresses, instructions and identifiers not already captured." }
+    }
+  }
+}

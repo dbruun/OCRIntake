@@ -1,0 +1,17 @@
+:root { font-family: system-ui, sans-serif; color: #172d40; background: #f3f6f9; }
+body { margin: 0; }
+main { max-width: 1200px; margin: auto; padding: 2rem; }
+section, form { margin-bottom: 1.5rem; }
+label { display: block; margin: 1rem 0; font-weight: 600; }
+input:not([type=checkbox]), textarea, select { display: block; box-sizing: border-box; width: 100%; padding: .7rem; margin-top: .4rem; border: 1px solid #8194a5; border-radius: 4px; font: inherit; background: white; }
+textarea { min-height: 65px; resize: vertical; }
+small { display: block; margin-top: .4rem; font-weight: normal; overflow-wrap: anywhere; }
+button { background: #145787; color: white; border: 0; padding: .8rem 1.2rem; border-radius: 4px; cursor: pointer; font: inherit; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+img { max-width: 100%; max-height: 80vh; object-fit: contain; position: sticky; top: 1rem; }
+.notice { background: #fff3d2; border-left: 4px solid #996300; padding: 1rem; }
+.check { font-weight: normal; }
+fieldset { border: 1px solid #8194a5; }
+#status { font-weight: 600; }
+@media (max-width: 700px) { .columns { grid-template-columns: 1fr; } main { padding: 1rem; } img { position: static; } }
